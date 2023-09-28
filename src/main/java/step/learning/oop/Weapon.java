@@ -1,12 +1,15 @@
 package step.learning.oop;
 
 public abstract class Weapon {
-    public abstract String getCard();
+    private String name ;
 
-    protected void setName(String name) {
+    public String getName() {
+        return name;
     }
 
-    protected Object getName() {
-return 0;
+    public void setName(String name) {
+        this.name = name;
     }
+
+    public abstract String getCard() ;
 }

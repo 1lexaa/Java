@@ -1,4 +1,4 @@
-package step.learning;
+package step.learning.basics;
 import java.util.*;
 
 public class Dictionary {

@@ -1,5 +1,4 @@
-package step.learning;
-import java.util.*;
+package step.learning.basics;
 
 public class ResultL {
     public static void main( String[] args )
