@@ -2,51 +2,53 @@ package step.learning.oop;
 
 import com.google.gson.JsonObject;
 
-public class Rifle extends Weapon {
-    private float caliber ;
+// The Rifle class extends the Weapon class and is a specific implementation of a weapon in the form of a rifle.
+public class Rifle extends Weapon implements Used
+{
+    private float _caliber;
 
-    public Rifle( String name, float caliber ) {
-        super.setName( name ) ;
-        this.setCaliber( caliber ) ;
+    public Rifle(String name, float _caliber)
+    {
+        super.SetName(name);
+        this._caliber = _caliber;
     }
 
-    public float getCaliber() {
-        return caliber;
+    public float GetCaliber() { return _caliber; }
+
+    public void SetCaliber(float caliber) { this._caliber = caliber; }
+
+    public static Gun FromJSON(JsonObject json_object) throws IllegalAccessException
+    {
+        String [] required_fields = {"_name", "_caliber"};
+
+        for (String field : required_fields)
+        {
+            if (!json_object.has(field))
+                throw new IllegalAccessException("Rifle construct error: Missing required filed - " + field);
+        }
+
+        return new Gun(json_object.get(required_fields[0]).getAsString(),  json_object.get(required_fields[1]).getAsInt());
     }
 
-    public void setCaliber(float caliber) {
-        this.caliber = caliber;
+    public static boolean IsParseableFromJSON(JsonObject json_object)
+    {
+        String[] required_fields = {"_name", "_caliber"};
+
+        for (String field : required_fields)
+        {
+            if (!json_object.has(field))
+                return false;
+        }
+
+        return true;
     }
 
     @Override
-    public String getCard() {
-        return String.format(
-                "Rifle: '%s' (caliber %.2f mm)",
-                super.getName(),
-                this.getCaliber()
-        ) ;
+    public String GetCard()  // Overrides the abstract GetCard method from the Weapon class.
+    {                       // It returns a string describing the rifle, including its name and caliber in millimeters.
+        return String.format("Rifle: '%s' (caliber %.2f mm)", super.GetName(), this.GetCaliber());
     }
 
-
-    public static boolean isParseableFromJson( JsonObject jsonObject ) {
-        String[] requiredFields = { "name", "caliber" } ;
-        for( String field : requiredFields ) {
-            if( ! jsonObject.has( field ) ) {
-                return false ;
-            }
-        }
-        return true ;
-    }
-    public static Rifle fromJson( JsonObject jsonObject ) throws IllegalArgumentException {
-        String[] requiredFields = { "name", "caliber" } ;
-        for( String field : requiredFields ) {
-            if( ! jsonObject.has( field ) ) {
-                throw new IllegalArgumentException( "Rifle construct error: Missing required field: " + field ) ;
-            }
-        }
-        return new Rifle(
-                jsonObject.get( requiredFields[0] ).getAsString(),
-                jsonObject.get( requiredFields[1] ).getAsFloat()
-        ) ;
-    }
+    @Override
+    public int GetYears() { return 3; }
 }

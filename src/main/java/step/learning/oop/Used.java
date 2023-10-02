@@ -1,6 +1,6 @@
 package step.learning.oop;
 
-public interface IUsed
+public interface Used
 {
     int GetYears();
 }

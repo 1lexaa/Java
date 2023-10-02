@@ -1,6 +1,6 @@
 package step.learning.oop;
 
-public interface Automatic
+public interface Rifled
 {
 
 }

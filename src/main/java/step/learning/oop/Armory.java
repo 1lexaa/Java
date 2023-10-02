@@ -2,18 +2,17 @@ package step.learning.oop;
 
 import com.google.gson.*;
 
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 
 // This class represents an example of using object-oriented programming (OOP) in Java,
-//  where Weapon and the IAutomatic and IClassified interfaces represent different types of weapons and their characteristics.
+// where Weapon and the IAutomatic and IClassified interfaces represent different types of weapons and their characteristics.
 public class Armory
 {
     private final List<Weapon> _weapons;
@@ -27,6 +26,63 @@ public class Armory
 
     public void Remove(Weapon weapon) { _weapons.remove(weapon); }  // Method for removing weapons from the arsenal.
 
+    private List<Weapon> GetSerializableWeapons()
+    {
+        List<Weapon> result = new LinkedList<>();
+
+        for (Weapon weapon : _weapons)
+        {
+            if (weapon.getClass().isAnnotationPresent(Serializable.class))
+                result.add(weapon);
+        }
+
+        return result;
+    }
+
+    private List<Class<?>> FindSerializableClasess()
+    {
+        List<Class<?>> weapon_clasess = new ArrayList<>();
+        String armory_name = Armory.class.getName();
+        String package_name = armory_name.substring(0, armory_name.lastIndexOf('.') + 1);
+        String package_path = package_name.replace('.', '/');
+        String resource_path = Armory.class.getClassLoader().getResource(package_path).getPath();
+
+        try { resource_path = URLDecoder.decode(resource_path, "UTF-8"); }
+        catch (UnsupportedEncodingException ignored) { }
+
+
+        File resource_dictionary = new File(resource_path);
+        File[] files = resource_dictionary.listFiles();
+
+        if (files == null)
+            throw new RuntimeException(String.format("Dictionary '%s' got no file list", resource_dictionary));
+
+        for (File file : files)
+        {
+            if(file.isDirectory())
+                continue;
+            else if(file.isFile())
+            {
+                String filename = file.getName();
+
+                if (filename.endsWith(".class"))
+                {
+                    String class_name = package_name + filename.substring(0, filename.lastIndexOf('.'));
+
+                    try
+                    {
+                        Class<?> class_type = Class.forName(class_name);
+
+                        if(class_type.isAnnotationPresent(Serializable.class) && Weapon.class.isAssignableFrom(class_type))
+                            weapon_clasess.add(class_type);
+                    }
+                    catch (ClassNotFoundException ignored) { System.err.println("Not found: " + class_name); }
+                }
+            }
+        }
+        return weapon_clasess;
+    }
+
     public void Save()
     {
         String path = URLDecoder.decode( this.getClass().getClassLoader().getResource("./").getPath());
@@ -37,14 +93,14 @@ public class Armory
         {
             Gson gson = new GsonBuilder().setPrettyPrinting().serializeNulls().create();
 
-            writer.write(gson.toJson(_weapons));
+            writer.write(gson.toJson(this.GetSerializableWeapons()));
         }
         catch (IOException ex) { throw new RuntimeException(ex); }
     }
 
     public void Load() throws RuntimeException
     {
-        Class<?>[] weapon_classes = { Gun.class, MachineGun.class, Rifle.class };
+        Class<?>[] weapon_classes = FindSerializableClasess().toArray(new Class[0]);
 
         try( InputStreamReader reader = new InputStreamReader(Objects.requireNonNull(
                 this.getClass().getClassLoader().getResourceAsStream("armory.json"))))
@@ -58,35 +114,54 @@ public class Armory
 
                 for(Class<?> weapon_class : weapon_classes)
                 {
-                    Method IsParseableFromJSON = weapon_class.getDeclaredMethod("IsParseableFromJSON", JsonObject.class);
+                    Method isParseableFromJSON = null; // = weapon_class.getDeclaredMethod("IsParseableFromJSON", JsonObject.class);
+                    Method from_json = null; // = weapon_class.getDeclaredMethod("FromJSON", JsonObject.class);
 
-                    IsParseableFromJSON.setAccessible(true);
+                    for (Method method : weapon_class.getDeclaredMethods())
+                    {
+                        if (method.isAnnotationPresent(JsonParseCheck.class))
+                        {
+                            if (isParseableFromJSON != null)
+                                throw new RuntimeException(String.format("Multipple methods with @%s anotation in %s class",
+                                        JsonParseCheck.class.getName(), weapon_class.getName()));
 
-                    boolean res = (boolean) IsParseableFromJSON.invoke(null, json_object);
+                            isParseableFromJSON = method;
+                        }
+                        if (method.isAnnotationPresent(JsonFactory.class))
+                        {
+                            if (from_json != null)
+                            {
+                                throw new  RuntimeException(String.format("Multipple methods with @%s anotation in %s class",
+                                        JsonFactory.class.getName(), weapon_class.getName()));
+                            }
+                            from_json = method;
+                        }
+                    }
+
+                    if(isParseableFromJSON == null || from_json == null)
+                        continue;
+
+                    isParseableFromJSON.setAccessible(true);
+
+                    boolean res = (boolean) isParseableFromJSON.invoke(null, json_object);
 
                     if (res)
                     {
-                        Method from_json = weapon_class.getDeclaredMethod("FromJson", JsonObject.class);
-
                         from_json.setAccessible(true);
 
                         weapon = (Weapon) from_json.invoke(null, json_object);
+
+                        break;
                     }
                 }
 
-                if(Gun.IsParseableFromJSON(json_object))
-                    weapon = Gun.FromJSON(json_object);
-                else if (MachineGun.IsParseableFromJSON(json_object))
-                    weapon = MachineGun.FromJSON(json_object);
-                else if(Rifle.IsParseableFromJSON(json_object))
-                    weapon = Rifle.FromJSON(json_object);
                 if (weapon != null)
                     this._weapons.add(weapon);
                 else
                     System.out.println("Weapon type unricognized");
             }
         }
-        catch(NoSuchMethodException | IllegalAccessException | InvocationTargetException ex )
+        catch(IllegalAccessException | InvocationTargetException ex )
         {
             throw new RuntimeException( "Reflection error: " + ex.getMessage() ) ;
         }
@@ -122,7 +197,7 @@ public class Armory
         }
     }
 
-    public boolean IsAutomatic(Weapon weapon) { return weapon instanceof IAutomatic; }  // A method that checks whether the passed weapon is automatic by checking whether the weapon implements the IAutomatic interface.
+    public boolean IsAutomatic(Weapon weapon) { return weapon instanceof Automatic; }  // A method that checks whether the passed weapon is automatic by checking whether the weapon implements the IAutomatic interface.
 
     public void PrintClassified()  // Method for displaying information about classified weapons in the arsenal.
     {                             // Determines whether a weapon is classified using the IsClassifide method and displays information about it,
@@ -131,13 +206,13 @@ public class Armory
         {
             if(IsClassifide(weapon))
             {
-                IClassified weapon_as_classifaed = (IClassified)weapon;
-                System.out.println(weapon_as_classifaed.GetLevel() + " " + weapon.GetCard());
+                Classifield weapon_as_classifaed = (Classifield)weapon;
+                System.out.println(weapon_as_classifaed.getLevel() + " " + weapon.GetCard());
             }
         }
     }
 
-    public boolean IsClassifide(Weapon weapon) { return weapon instanceof IClassified; }  // A method that checks whether the supplied weapon is classified by checking whether the weapon implements the IClassified interface.
+    public boolean IsClassifide(Weapon weapon) { return weapon instanceof Classifield; }  // A method that checks whether the supplied weapon is classified by checking whether the weapon implements the IClassified interface.
 
     public void GetYears()
     {
@@ -145,7 +220,7 @@ public class Armory
         {
             if(IsClassifide(weapon))
             {
-                IUsed weapon_year = (IUsed) weapon;
+                Used weapon_year = (Used) weapon;
                 System.out.println(weapon.GetName() + " - " + weapon_year.GetYears() + "year");
             }
         }
