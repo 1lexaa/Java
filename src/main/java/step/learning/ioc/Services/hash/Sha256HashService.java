@@ -1,10 +1,10 @@
-package step.learning.ioc.Services;
+package step.learning.ioc.Services.hash;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-public class Md5HashService implements HashService
+public class Sha256HashService implements HashService
 {
     @Override
     public String Hash(String input)
@@ -14,7 +14,7 @@ public class Md5HashService implements HashService
 
         try
         {
-            MessageDigest digest = MessageDigest.getInstance("MD5");
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
             StringBuilder sb = new StringBuilder();
 
             for(int b : digest.digest(input.getBytes(StandardCharsets.UTF_8)))
